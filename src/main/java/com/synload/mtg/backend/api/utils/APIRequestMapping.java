@@ -6,9 +6,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface APIRequest {
-    String url();
-    String key();
-    int cache() default 0;
+@Target(ElementType.FIELD)
+public @interface APIRequestMapping {
+  String[] value();
+  String there();
 }

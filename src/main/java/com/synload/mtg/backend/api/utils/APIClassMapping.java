@@ -8,7 +8,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 public @interface APIClassMapping {
-    String value();
-    Class clazz();
-    String method();
+  String[] value();
 }

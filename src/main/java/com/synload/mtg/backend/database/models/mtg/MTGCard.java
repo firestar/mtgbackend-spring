@@ -10,68 +10,67 @@ import java.util.List;
 import java.util.Map;
 
 @MultipleAPIRequest({
-    @APIRequest(url="https://api.scryfall.com/cards/{id}", key="id"),
-    @APIRequest(url="https://api.scryfall.com/cards/multiverse/{multiverse}", key="multiverse[]"),
-    @APIRequest(url="https://api.scryfall.com/cards/{set.code}/{number}", key="set.code,number")
+  @APIRequest(url="https://api.scryfall.com/cards/{id}", key="id", cache=300000),
+  @APIRequest(url="https://api.scryfall.com/cards/multiverse/{multiverse}", key="multiverse", cache=300000),
+  @APIRequest(url="https://api.scryfall.com/cards/{set.code}/{number}", key="set.code,number", cache=300000)
 })
 public class MTGCard extends Card {
+  @APIRequestMapping(value={"set"}, there="code")
+  public MTGSet set = null;
 
-    @APIClassMapping(value="set", clazz=ScryFallHandler.class, method="getSet")
-    public MTGSet set = null;
+  @APIMapping({"name"})
+  public String name;
 
-    @APIMapping({"name"})
-    public String name;
+  @APIMapping({"collector_number"})
+  public String number;
 
-    @APIMapping({"collector_number"})
-    public String number;
+  @APIMapping({"lang"})
+  public String lang;
 
-    @APIMapping({"lang"})
-    public String lang;
+  @APIMapping({"type_line"})
+  public String type;
 
-    @APIMapping({"type_line"})
-    public String type;
+  @APIMapping({"mana_cost"})
+  public String mana;
 
-    @APIMapping({"mana_cost"})
-    public String mana;
+  @APIMapping({"multiverse_ids"})
+  public List<Integer> multiverse;
 
-    @APIMapping({"multiverse_ids"})
-    public List<Integer> multiverse;
+  @APIMapping({"id"})
+  public String id;
 
-    @APIMapping({"id"})
-    public String id;
+  @APIMapping({"power"})
+  public String power;
 
-    @APIMapping({"power"})
-    public int power;
+  @APIMapping({"toughness"})
+  public String toughness;
 
-    @APIMapping({"toughness"})
-    public int toughness;
+  @APIMapping({"legalities"})
+  public Map<String, String> legalities;
 
-    @APIMapping({"legalities"})
-    public Map<String, String> legalities;
+  @APIMapping({"image_uris"})
+  public Map<String, String> images;
 
-    @APIMapping({"image_uris"})
-    public Map<String, String> images;
+  @APIMapping({"rarity"})
+  public String rarity;
 
-    @APIMapping({"rarity"})
-    public String rarity;
+  @APIMapping({"foil"})
+  public Boolean foil;
 
-    @APIMapping({"foil"})
-    public boolean foil;
+  @APIMapping({"nonfoil"})
+  public Boolean nonfoil;
 
-    @APIMapping({"nonfoil"})
-    public boolean nonfoil;
+  @APIMapping({"color_identity"})
+  public List<String> color_identity;
 
-    @APIMapping({"color_identity"})
-    public String[] color_identity;
+  @APIMapping({"colors"})
+  public List<String> colors;
 
-    @APIMapping({"colors"})
-    public String[] colors;
+  @APIClassMapping({"card_faces"})
+  public List<MTGCardFace> faces;
 
-    @APIClassMapping(value="card_faces", clazz=ScryFallHandler.class, method="setFace")
-    public MTGCardFace[] faces;
+  public MTGCard(){
 
-    public MTGCard(){
-
-    }
+  }
 
 }
