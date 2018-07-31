@@ -3,33 +3,44 @@ package com.synload.mtg.backend.api.scryfall;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synload.mtg.backend.api.utils.APIHandler;
-import com.synload.mtg.backend.database.models.mtg.MTGCard;
-import com.synload.mtg.backend.database.models.mtg.MTGSet;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
+
+@Service
 public class ScryFallHandler extends APIHandler {
+  private static final Logger logger = LogManager.getLogger(ScryFallHandler.class.getName());
   public ScryFallHandler(){
 
   }
   public MTGCard getCardById(String id) {
+    logger.debug("Fetched by id: " + id);
+    long start = System.currentTimeMillis();
     MTGCard card = new MTGCard();
     card.id = id;
-    get(card);
-    return null;
+    card = (MTGCard) get(card);
+    logger.info("Took " + (System.currentTimeMillis() - start) + " milliseconds to get data");
+    return card;
   }
-  public MTGCard getCardById(String set, String number) {
-    MTGSet setObj = new MTGSet();
-    setObj.code = set;
-    setObj = (MTGSet) get(setObj);
-    try {
-      ObjectMapper om = new ObjectMapper();
-      System.out.println(om.writeValueAsString(setObj));
-    }catch( Exception e){
-      e.printStackTrace();
-    }
+  public MTGCard getCardBySetId(String set, String number) {
+    logger.info("Fetched by set and number: " + set + " " + number);
+    long start = System.currentTimeMillis();
     MTGCard card = new MTGCard();
     card.number = number;
-    card.set = setObj;
-    get(card);
-    return null;
+    card.set = set;
+    card = (MTGCard) get(card);
+    logger.info("Took " + (System.currentTimeMillis() - start) + " milliseconds to get data");
+    return card;
+  }
+  public MTGSet getSetByCode(String set){
+    logger.info("Fetched by set: " + set);
+    long start = System.currentTimeMillis();
+    MTGSet mset = new MTGSet();
+    mset.code = set;
+    mset = (MTGSet) get(mset);
+    logger.info("Took " + (System.currentTimeMillis() - start) + " milliseconds to get data");
+    return mset;
   }
 }

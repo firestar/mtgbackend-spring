@@ -1,15 +1,17 @@
 package com.synload.mtg.backend.api.utils;
 
 
-import ch.qos.logback.core.net.ObjectWriter;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.synload.mtg.backend.database.models.mtg.MTGSet;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -17,45 +19,158 @@ import java.util.*;
 
 import org.json.*;
 
+
 public class APIHandler {
   RestTemplate restTemplate = new RestTemplate();
 
-  static TreeMap<String, TreeMap<String, TreeMap<Object, Object[]>>> cache = new TreeMap<>();
+  private static final Logger logger = LogManager.getLogger(APIHandler.class.getName());
 
-  public class Data {
-    String data;
-    public Data(String data) {
-      this.data = data;
+  public TreeMap<String, TreeMap<String, TreeMap<Object, Object[]>>> cache = new TreeMap<>();
+  public List<Object> objects = new ArrayList<>();
+  public boolean changed = false;
+  public boolean loaded = false;
+
+
+  public APIHandler() {
+    ObjectInputStream objectInputStream = null;
+    try {
+      if (new File("data.db").exists()) {
+        objectInputStream = new ObjectInputStream(new FileInputStream("data.db"));
+        List<Object> objects = (List<Object>) objectInputStream.readObject();
+        this.objects = objects;
+        List<Stack<Object>> loadOrder = new ArrayList<>();
+        for(int x=0;x<9;x++) {
+          loadOrder.add(new Stack<>());
+        }
+        objects.forEach(i -> {
+          if(i.getClass().isAnnotationPresent(APIPriority.class)){
+            int k = i.getClass().getAnnotation(APIPriority.class).value()-1;
+            if(k==0) {
+              JSONObject o = new JSONObject();
+              for (Field f : i.getClass().getFields()) {
+                if(f.isAnnotationPresent(APIClear.class)){
+                  try {
+                    if(f.getType()==List.class) {
+                      f.set(i, new ArrayList<>());
+                    }else{
+                      f.set(i, null);
+                    }
+                  }catch (Exception e){
+                    e.printStackTrace();
+                  }
+                }
+                if (f.isAnnotationPresent(APIMapping.class)) {
+                  if (f.getAnnotation(APIMapping.class).loadingVar()) {
+                    try {
+                      o.put(f.getName(), f.get(i));
+                    } catch (Exception e) {
+                      e.printStackTrace();
+                    }
+                  }
+                }
+              }
+              mapJsonToObject(i, o, false);
+              addCache(i, true);
+            }else{
+              if(loadOrder.get(k)==null){
+                loadOrder.add(k-1, new Stack<>());
+              }
+              loadOrder.get(k).add(i);
+            }
+          } else {
+            loadOrder.get(5).add(i);
+          }
+        });
+        loadOthers( loadOrder,1);
+        //logger.info(new ObjectMapper().writeValueAsString(this.cache));
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }finally{
+      if(objectInputStream!=null) {
+        try {
+          objectInputStream.close();
+        }catch (Exception e){
+          e.printStackTrace();
+        }
+      }
     }
-    public String getData() {
-      return data;
+    loaded = true;
+  }
+
+  void loadOthers(List<Stack<Object>> loadOrder, int priority) {
+    if(priority==9){
+      return;
     }
-    public void setData(String data) {
-      this.data = data;
+    while(!loadOrder.get(priority).isEmpty()) {
+      Object i = loadOrder.get(priority).pop();
+      JSONObject o = new JSONObject();
+      for (Field f : i.getClass().getFields()) {
+        if(f.isAnnotationPresent(APIClear.class)){
+          try {
+            if(f.getType()==List.class) {
+              f.set(i, new ArrayList<>());
+            }else{
+              f.set(i, null);
+            }
+          }catch (Exception e){
+            e.printStackTrace();
+          }
+        }
+        if (f.isAnnotationPresent(APIMapping.class)) {
+          if (f.getAnnotation(APIMapping.class).loadingVar()) {
+            try {
+              o.put(f.getName(), f.get(i));
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
+        }
+      }
+      mapJsonToObject(i, o, false);
+      addCache(i, true);
+    }
+    loadOthers(loadOrder, priority+1);
+  }
+
+  @Scheduled(fixedRate = 3000)
+  void save() {
+    if (changed) {
+      changed = false;
+      try {
+        FileOutputStream fos = new FileOutputStream("data.db");
+        ObjectOutputStream oos = new ObjectOutputStream(fos);
+        oos.writeObject(objects);
+        oos.close();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
     }
   }
 
   public Object get(Object o) {
+    if (!loaded) {
+      return null;
+    }
     Object oCached = checkCache(o);
-    if(oCached != null){
-      System.out.println("Cache Hit");
+    if (oCached != null) {
+      logger.info("Cache Hit");
       return oCached;
     }
     String data = process(o);
-    mapJsonToObject(o, new JSONObject(data));
-    addCache(o);
-    ObjectMapper om = new ObjectMapper();
-    try {
-      System.out.println(om.writeValueAsString(cache));
-    } catch (Exception e) {
-      e.printStackTrace();
+    logger.info(data);
+    if (data == null) {
+      return null;
     }
+    mapJsonToObject(o, new JSONObject(data), true);
+    addCache(o, false);
     return o;
   }
 
-  void mapJsonToObject(Object o, JSONObject obj){
+  void mapJsonToObject(Object o, JSONObject obj, boolean apiData) {
+    logger.info(o.getClass().getName() + " loaded");
     for (Field field : o.getClass().getFields()) {
-      if (field.isAnnotationPresent(APIMapping.class)) {
+      if (field.isAnnotationPresent(APIMapping.class) && apiData) {
         APIMapping map = field.getAnnotation(APIMapping.class);
         String[] keys = map.value();
         boolean used = false;
@@ -73,14 +188,14 @@ public class APIHandler {
                     field.set(o, object);
                     used = true;
                   } else if (JSONArray.class.isInstance(object)) {
-                    JSONArray array = ((JSONArray)object);
+                    JSONArray array = ((JSONArray) object);
                     List items = new ArrayList<>();
-                    for(int j=0;j<array.length();j++){
+                    for (int j = 0; j < array.length(); j++) {
                       items.add(array.get(j));
                     }
                     field.set(o, items);
                     used = true;
-                  } else if(JSONObject.class.isInstance(object) && Map.class==field.getType()){
+                  } else if (JSONObject.class.isInstance(object) && Map.class == field.getType()) {
                     JSONObject jsonObj = (JSONObject) object;
                     field.set(o, jsonObj.toMap());
                     used = true;
@@ -93,11 +208,11 @@ public class APIHandler {
           } catch (Exception e) {
             e.printStackTrace();
           }
-          if(used){
+          if (used) {
             break;
           }
         }
-      }else if(field.isAnnotationPresent(APIClassMapping.class)){
+      } else if (field.isAnnotationPresent(APIClassMapping.class) && apiData) {
         APIClassMapping map = field.getAnnotation(APIClassMapping.class);
         String[] keys = map.value();
         Type type = field.getGenericType();
@@ -123,19 +238,19 @@ public class APIHandler {
                 if (i + 1 == paths.length) {
                   Object object = tmp.get(paths[i]);
 
-                  if(JSONObject.class.isInstance(object)){
+                  if (JSONObject.class.isInstance(object)) {
                     Object itemObj = clazz.newInstance();
-                    mapJsonToObject( itemObj, (JSONObject)object);
+                    mapJsonToObject(itemObj, (JSONObject) object, true);
                     field.set(o, itemObj);
                     used = true;
                     break;
-                  } else if(JSONArray.class.isInstance(object)){
+                  } else if (JSONArray.class.isInstance(object)) {
                     List items = new ArrayList();
-                    JSONArray array =(JSONArray)object;
-                    for(int j = 0; j < array.length(); j++ ){
-                      if(JSONObject.class.isInstance(array.get(j))) {
+                    JSONArray array = (JSONArray) object;
+                    for (int j = 0; j < array.length(); j++) {
+                      if (JSONObject.class.isInstance(array.get(j))) {
                         Object itemObj = clazz.newInstance();
-                        mapJsonToObject(itemObj, (JSONObject)array.get(j));
+                        mapJsonToObject(itemObj, (JSONObject) array.get(j), true);
                         items.add(itemObj);
                       }
                     }
@@ -151,11 +266,11 @@ public class APIHandler {
           } catch (Exception e) {
             e.printStackTrace();
           }
-          if(used){
+          if (used) {
             break;
           }
         }
-      }else if(field.isAnnotationPresent(APIRequestMapping.class)){
+      } else if (field.isAnnotationPresent(APIRequestMapping.class)) {
         APIRequestMapping map = field.getAnnotation(APIRequestMapping.class);
         String[] keys = map.value();
         String there = map.there();
@@ -170,10 +285,10 @@ public class APIHandler {
               } else {
                 if (i + 1 == paths.length) {
                   Object object = tmp.get(paths[i]);
-                  if(JSONArray.class.isInstance(object)){
+                  if (JSONArray.class.isInstance(object)) {
                     List items = new ArrayList();
-                    JSONArray array =(JSONArray)object;
-                    for(int j = 0; j < array.length(); j++ ){
+                    JSONArray array = (JSONArray) object;
+                    for (int j = 0; j < array.length(); j++) {
                       Object oObject = field.getType().newInstance(); // Other Object
                       Field oField = oObject.getClass().getField(there);
                       oField.set(oObject, array.get(j));
@@ -200,11 +315,47 @@ public class APIHandler {
           } catch (Exception e) {
             e.printStackTrace();
           }
-          if(used){
+          if (used) {
             break;
           }
         }
       }
+    }
+    if (o.getClass().isAnnotationPresent(APILink.class)) {
+      processLink(o, o.getClass().getAnnotation(APILink.class));
+    }
+  }
+
+  public void processLink(Object o, APILink link) {
+    String from = link.from();
+    String to = link.to();
+    String field = link.field();
+    Class clazz = link.clazz();
+    try {
+      Field f1 = o.getClass().getField(from);
+      Object data = f1.get(o);
+      Object obj = clazz.newInstance();
+      Field f2 = obj.getClass().getField(to);
+      f2.set(obj, data);
+      obj = checkCache(obj);
+      if (obj != null) {
+        Field addToField = clazz.getField(field);
+        if (addToField != null) {
+          if (addToField.getType() == List.class) {
+            List<Object> objects = (List<Object>) addToField.get(obj);
+            if (objects == null) {
+              objects = new ArrayList<>();
+            }
+            objects.add(o);
+            logger.info(o.getClass().getName() + " linked to " + obj.getClass().getName() + " (n)");
+          } else if (addToField.getType() == clazz) {
+            addToField.set(obj, o);
+            logger.info(o.getClass().getName() + " linked to " + obj.getClass().getName() + " (1)");
+          }
+        }
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
     }
   }
 
@@ -220,7 +371,7 @@ public class APIHandler {
       }
     } else if (o.getClass().isAnnotationPresent(APIRequest.class)) {
       APIRequest request = o.getClass().getAnnotation(APIRequest.class);
-      if(request.cache()==0){
+      if (request.cache() == 0) {
         return null;
       }
       String data = handleGetRequest(request, o);
@@ -230,20 +381,21 @@ public class APIHandler {
     }
     return null;
   }
-  Object checkCacheInner(Object o, String keySet){
+
+  Object checkCacheInner(Object o, String keySet, boolean useCache) {
     try {
       Class clazz = o.getClass();
       String clazzName = clazz.getName();
-      if(cache.containsKey(clazzName)){
+      if (cache.containsKey(clazzName)) {
         TreeMap<String, TreeMap<Object, Object[]>> clazzObjects = cache.get(clazzName);
-        if(clazzObjects.containsKey(keySet)){
+        if (clazzObjects.containsKey(keySet)) {
           TreeMap<Object, Object[]> clazzKeyObjects = clazzObjects.get(keySet);
           String key = keyBuilder(keySet, o);
-          if(key!=null) {
+          if (key != null) {
             if (clazzKeyObjects.containsKey(key)) {
               Object[] objCache = clazzKeyObjects.get(key);
               long timeout = (long) objCache[0];
-              if (timeout > System.currentTimeMillis()) {
+              if (timeout > System.currentTimeMillis() || useCache) {
                 return objCache[1];
               }
               clazzKeyObjects.remove(key);
@@ -264,17 +416,17 @@ public class APIHandler {
       MultipleAPIRequest mapir = o.getClass().getAnnotation(MultipleAPIRequest.class);
       APIRequest[] requests = mapir.value();
       for (APIRequest request : requests) {
-        if(request.cache()==0){
+        if (request.cache() == 0) {
           continue;
         }
-        Object found = checkCacheInner(o, request.key());
+        Object found = checkCacheInner(o, request.key(), (request.cache() == -1) ? true : false);
         if (found != null) {
           return found;
         }
       }
     } else if (clazz.isAnnotationPresent(APIRequest.class)) {
       APIRequest request = o.getClass().getAnnotation(APIRequest.class);
-      Object found = checkCacheInner(o, request.key());
+      Object found = checkCacheInner(o, request.key(), (request.cache() == -1) ? true : false);
       if (found != null) {
         return found;
       }
@@ -286,72 +438,90 @@ public class APIHandler {
     ObjectMapper om = new ObjectMapper();
     String[] keys = keySet.split(",");
     List<Object> items = new ArrayList<>();
-    for(int i=0;i<keys.length;i++){
+    for (int i = 0; i < keys.length; i++) {
       String[] objs = keys[i].split("\\.");
-      Object tmp=o;
-      for(int j=0;j<objs.length;j++){
+      Object tmp = o;
+      for (int j = 0; j < objs.length; j++) {
         try {
-          tmp=tmp.getClass().getField(objs[j]).get(tmp);
-          if (tmp==null) {
+          //logger.info("adding field "+ objs[j] + " from "+new ObjectMapper().writeValueAsString(tmp));
+          tmp = tmp.getClass().getField(objs[j]).get(tmp);
+          if (tmp == null) {
             return null;
           }
         } catch (Exception e) {
-          e.printStackTrace();
+          //e.printStackTrace();
           return null;
         }
       }
-      if(tmp==null){
+      if (tmp == null) {
         return null;
       }
       items.add(tmp);
     }
     try {
       return om.writeValueAsString(items);
-    }catch (Exception e){
-      e.printStackTrace();
-    }
-    return null;
-  }
-
-  Object addCacheInner(Object o, String keySet, long cacheTimeout){
-    try {
-      Class clazz = o.getClass();
-      String clazzName = clazz.getName();
-      if(!cache.containsKey(clazzName)) {
-        cache.put(clazzName, new TreeMap<String, TreeMap<Object, Object[]>>());
-      }
-      TreeMap<String, TreeMap<Object, Object[]>> clazzObjects = cache.get(clazzName);
-      if(!clazzObjects.containsKey(keySet)) {
-        clazzObjects.put(keySet, new TreeMap<Object, Object[]>());
-      }
-      TreeMap<Object, Object[]> clazzKeyObjects = clazzObjects.get(keySet);
-      String key = keyBuilder(keySet, o);
-      if(key!=null) {
-        clazzKeyObjects.put(key, new Object[]{System.currentTimeMillis()+cacheTimeout, o});
-      }
     } catch (Exception e) {
       e.printStackTrace();
     }
     return null;
   }
 
-  void addCache(Object o) {
+  boolean addCacheInner(Object o, String keySet, long cacheTimeout) {
+    try {
+      Class clazz = o.getClass();
+      String clazzName = clazz.getName();
+      if (!cache.containsKey(clazzName)) {
+        cache.put(clazzName, new TreeMap<String, TreeMap<Object, Object[]>>());
+      }
+      TreeMap<String, TreeMap<Object, Object[]>> clazzObjects = cache.get(clazzName);
+      if (!clazzObjects.containsKey(keySet)) {
+        clazzObjects.put(keySet, new TreeMap<Object, Object[]>());
+      }
+      TreeMap<Object, Object[]> clazzKeyObjects = clazzObjects.get(keySet);
+      String key = keyBuilder(keySet, o);
+      if (key != null) {
+        clazzKeyObjects.put(key, new Object[]{System.currentTimeMillis() + cacheTimeout, o});
+        return true;
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return false;
+  }
+
+  void addCache(Object o, boolean forceNoAdd) {
     Class clazz = o.getClass();
+    boolean cached = false;
     if (clazz.isAnnotationPresent(MultipleAPIRequest.class)) {
       MultipleAPIRequest mapir = o.getClass().getAnnotation(MultipleAPIRequest.class);
       APIRequest[] requests = mapir.value();
       for (APIRequest request : requests) {
-        if(request.cache()==0){
+        if (request.cache() == 0) {
           continue;
+        } else if (request.cache() == -1) {
+          cached = true;
         }
         addCacheInner(o, request.key(), request.cache());
       }
     } else if (clazz.isAnnotationPresent(APIRequest.class)) {
       APIRequest request = o.getClass().getAnnotation(APIRequest.class);
-      if(request.cache()==0){
+      if (request.cache() == 0) {
         return;
+      } else if (request.cache() == -1) {
+        cached = true;
       }
-      addCacheInner(o, request.key(), request.cache());
+      cached = addCacheInner(o, request.key(), request.cache());
+    }
+    if (cached) {
+      if (!forceNoAdd) {
+        try {
+          logger.info("Added to cache " + new ObjectMapper().writeValueAsString(o));
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+        objects.add(o);
+      }
+      changed = true;
     }
   }
 
@@ -378,7 +548,6 @@ public class APIHandler {
     }
     String url = request.url();
     for (Map.Entry<String, Object> entry : values.entrySet()) {
-      System.out.println(entry.getKey() + " : " + entry.getValue());
       url = url.replace("{" + entry.getKey() + "}", entry.getValue().toString());
     }
     final HttpHeaders headers = new HttpHeaders();
@@ -388,7 +557,7 @@ public class APIHandler {
       ResponseEntity<String> rest = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
       String data = rest.getBody();
       return data;
-    }catch (Exception e){
+    } catch (Exception e) {
       e.printStackTrace();
     }
     return null;

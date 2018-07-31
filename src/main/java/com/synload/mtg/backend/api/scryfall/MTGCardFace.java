@@ -1,11 +1,12 @@
-package com.synload.mtg.backend.database.models.mtg;
+package com.synload.mtg.backend.api.scryfall;
 
 import com.synload.mtg.backend.api.utils.*;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-public class MTGCardFace {
+public class MTGCardFace implements Serializable {
   @APIMapping({"name"})
   public String name;
 

@@ -1,22 +1,25 @@
-package com.synload.mtg.backend.database.models.mtg;
+package com.synload.mtg.backend.api.scryfall;
 
 
 import com.synload.mtg.backend.api.utils.MultipleAPIRequest;
-import com.synload.mtg.backend.database.models.Card;
-
-import com.synload.mtg.backend.api.scryfall.*;
 import com.synload.mtg.backend.api.utils.*;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
 @MultipleAPIRequest({
-  @APIRequest(url="https://api.scryfall.com/cards/{id}", key="id", cache=300000),
-  @APIRequest(url="https://api.scryfall.com/cards/multiverse/{multiverse}", key="multiverse", cache=300000),
-  @APIRequest(url="https://api.scryfall.com/cards/{set.code}/{number}", key="set.code,number", cache=300000)
+  @APIRequest(url="https://api.scryfall.com/cards/{id}", key="id", cache=-1),
+  @APIRequest(url="https://api.scryfall.com/cards/multiverse/{multiverse}", key="multiverse", cache=-1),
+  @APIRequest(url="https://api.scryfall.com/cards/{set}/{number}", key="set,number", cache=-1)
 })
-public class MTGCard extends Card {
+@APILink(from = "set", to="code", clazz = MTGSet.class, field="cards")
+@APIPriority(2)
+public class MTGCard implements Serializable {
   @APIRequestMapping(value={"set"}, there="code")
-  public MTGSet set = null;
+  public transient MTGSet setData = null;
+
+  @APIMapping(value = {"set"}, loadingVar = true)
+  public String set;
 
   @APIMapping({"name"})
   public String name;
