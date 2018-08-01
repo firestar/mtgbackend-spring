@@ -15,7 +15,7 @@ node {
         stage('Docker Build') {
             sh "mkdir dockerbuild/"
             sh 'cp build/libs/*.jar dockerbuild/app.jar && cp Dockerfile dockerbuild/Dockerfile'
-            app = docker.build("${env.DOCKER_ACCOUNT}/${env.BUILD_ID}", "./dockerbuild/")
+            app = docker.build("${env.DOCKER_ACCOUNT}/${env.IMAGE_NAME}", "./dockerbuild/")
             archiveArtifacts(artifacts: 'build/libs/*.jar', onlyIfSuccessful: true)
         }
         stage('Test image') {
