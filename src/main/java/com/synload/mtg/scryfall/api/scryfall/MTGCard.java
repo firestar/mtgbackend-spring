@@ -1,8 +1,8 @@
-package com.synload.mtg.backend.api.scryfall;
+package com.synload.mtg.scryfall.api.scryfall;
 
 
-import com.synload.mtg.backend.api.utils.MultipleAPIRequest;
-import com.synload.mtg.backend.api.utils.*;
+import com.synload.mtg.scryfall.api.utils.MultipleAPIRequest;
+import com.synload.mtg.scryfall.api.utils.*;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;

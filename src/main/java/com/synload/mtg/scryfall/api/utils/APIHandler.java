@@ -1,4 +1,4 @@
-package com.synload.mtg.backend.api.utils;
+package com.synload.mtg.scryfall.api.utils;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,8 +34,8 @@ public class APIHandler {
   public APIHandler() {
     ObjectInputStream objectInputStream = null;
     try {
-      if (new File("data.db").exists()) {
-        objectInputStream = new ObjectInputStream(new FileInputStream("data.db"));
+      if (new File("/data/data.db").exists()) {
+        objectInputStream = new ObjectInputStream(new FileInputStream("/data/data.db"));
         List<Object> objects = (List<Object>) objectInputStream.readObject();
         this.objects = objects;
         List<Stack<Object>> loadOrder = new ArrayList<>();
@@ -138,7 +138,10 @@ public class APIHandler {
     if (changed) {
       changed = false;
       try {
-        FileOutputStream fos = new FileOutputStream("data.db");
+        if(!new File("/data/").exists()) {
+          new File("/data/").mkdir();
+        }
+        FileOutputStream fos = new FileOutputStream("/data/data.db");
         ObjectOutputStream oos = new ObjectOutputStream(fos);
         oos.writeObject(objects);
         oos.close();
@@ -515,7 +518,7 @@ public class APIHandler {
     if (cached) {
       if (!forceNoAdd) {
         try {
-          logger.info("Added to cache " + new ObjectMapper().writeValueAsString(o));
+          logger.info("Added to cache " + o.getClass().getName());
         } catch (Exception e) {
           e.printStackTrace();
         }

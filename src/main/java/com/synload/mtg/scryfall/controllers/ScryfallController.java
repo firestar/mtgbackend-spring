@@ -1,13 +1,10 @@
-package com.synload.mtg.backend.controllers;
+package com.synload.mtg.scryfall.controllers;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.synload.mtg.backend.api.scryfall.MTGCard;
-import com.synload.mtg.backend.api.scryfall.MTGSet;
-import com.synload.mtg.backend.api.scryfall.ScryFallHandler;
+import com.synload.mtg.scryfall.api.scryfall.MTGSet;
+import com.synload.mtg.scryfall.api.scryfall.ScryFallHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController()

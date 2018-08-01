@@ -1,4 +1,4 @@
-package com.synload.mtg.backend.api.utils;
+package com.synload.mtg.scryfall.api.utils;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -7,7 +7,6 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
-public @interface APIRequestMapping {
+public @interface APIClassMapping {
   String[] value();
-  String there();
 }

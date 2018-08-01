@@ -1,4 +1,4 @@
-package com.synload.mtg.backend;
+package com.synload.mtg.scryfall;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;

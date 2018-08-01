@@ -1,7 +1,6 @@
-package com.synload.mtg.backend.api.scryfall;
+package com.synload.mtg.scryfall.api.scryfall;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.synload.mtg.backend.api.utils.*;
+import com.synload.mtg.scryfall.api.utils.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;

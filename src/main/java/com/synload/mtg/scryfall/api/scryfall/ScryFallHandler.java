@@ -1,13 +1,9 @@
-package com.synload.mtg.backend.api.scryfall;
+package com.synload.mtg.scryfall.api.scryfall;
 
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.synload.mtg.backend.api.utils.APIHandler;
+import com.synload.mtg.scryfall.api.utils.APIHandler;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
-
-import javax.annotation.PostConstruct;
 
 @Service
 public class ScryFallHandler extends APIHandler {
